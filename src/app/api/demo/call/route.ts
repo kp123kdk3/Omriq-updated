@@ -48,7 +48,7 @@ export async function POST(req: Request) {
     const from = getTwilioFromNumber();
 
     // Twilio will request this URL to get TwiML instructions.
-    const twimlUrl = `${requestBaseUrl(req)}/api/twilio/voice?audioUrl=${encodeURIComponent(stored.url)}&turn=0`;
+    const twimlUrl = `${requestBaseUrl(req)}/api/twilio/voice?audioUrl=${encodeURIComponent(stored.url)}`;
 
     const call = await client.calls.create({
       to,
