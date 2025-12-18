@@ -4,9 +4,13 @@ import twilio from "twilio";
 
 export const runtime = "nodejs";
 
-function baseUrl() {
-  if (!env.APP_BASE_URL) throw new Error("Missing APP_BASE_URL. Twilio needs a public URL to fetch TwiML/audio.");
-  return env.APP_BASE_URL.replace(/\/$/, "");
+function requestBaseUrl(req: Request) {
+  // Prefer explicit env, but fall back to request headers (works well on Vercel).
+  if (env.APP_BASE_URL) return env.APP_BASE_URL;
+  const proto = req.headers.get("x-forwarded-proto") ?? "https";
+  const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? "";
+  if (!host) throw new Error("Missing APP_BASE_URL and could not infer host from request.");
+  return `${proto}://${host}`;
 }
 
 export async function POST(req: Request) {
@@ -20,7 +24,7 @@ export async function POST(req: Request) {
   if (!audioId) {
     twiml.say("Demo audio is not available.");
   } else {
-    twiml.play(`${baseUrl()}/api/media/${encodeURIComponent(audioId)}`);
+    twiml.play(`${requestBaseUrl(req)}/api/media/${encodeURIComponent(audioId)}`);
   }
   twiml.hangup();
 
@@ -40,7 +44,7 @@ export async function GET(req: Request) {
   if (!audioId) {
     twiml.say("Demo audio is not available.");
   } else {
-    twiml.play(`${baseUrl()}/api/media/${encodeURIComponent(audioId)}`);
+    twiml.play(`${requestBaseUrl(req)}/api/media/${encodeURIComponent(audioId)}`);
   }
   twiml.hangup();
 
