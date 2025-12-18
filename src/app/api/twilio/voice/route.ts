@@ -19,6 +19,7 @@ export async function POST(req: Request) {
   // Twilio hits this webhook (POST by default)
   const form = await req.formData();
   const speech = String(form.get("SpeechResult") ?? "").trim();
+  const digits = String(form.get("Digits") ?? "").trim();
   const url = new URL(req.url);
   const audioUrl = url.searchParams.get("audioUrl") ?? "";
 
@@ -27,7 +28,8 @@ export async function POST(req: Request) {
 
   // Requirement: keep the agent on the line indefinitely while the caller keeps speaking.
   // Hang up ONLY when the caller does not speak for > 8 seconds.
-  if (!speech) {
+  // Note: Twilio trial may require "press any key". If Digits exists, continue the flow.
+  if (!speech && !digits) {
     twiml.hangup();
     return new NextResponse(twiml.toString(), {
       status: 200,
@@ -36,18 +38,21 @@ export async function POST(req: Request) {
   }
 
   // Hotel-trained response (Omriq Grand Palais demo property).
-  const replyText = respondAsOmriqGrandPalais(speech);
+  const replyText = speech
+    ? respondAsOmriqGrandPalais(speech)
+    : "Thank you. How may I assist you at Omriq Grand Palais?";
   const replyMp3 = await synthesizeWithElevenLabs(replyText);
   const storedReply = await storeMp3ForTwilio(replyMp3, req);
   twiml.play(storedReply.url);
 
   const gather = twiml.gather({
-    input: ["speech"],
+    input: ["speech", "dtmf"],
     speechTimeout: "auto",
     timeout: 8,
     actionOnEmptyResult: true,
     action: actionUrl(req, { audioUrl: audioUrl || "" }),
     method: "POST",
+    numDigits: 1,
   });
   gather.say(" ");
 
@@ -72,23 +77,25 @@ export async function GET(req: Request) {
     const stored = await storeMp3ForTwilio(mp3, req);
     twiml.play(stored.url);
     const gather = twiml.gather({
-      input: ["speech"],
+      input: ["speech", "dtmf"],
       speechTimeout: "auto",
       timeout: 8,
       actionOnEmptyResult: true,
       action: actionUrl(req, { audioUrl: stored.url }),
       method: "POST",
+      numDigits: 1,
     });
     gather.say(" ");
   } else {
     twiml.play(audioUrl);
     const gather = twiml.gather({
-      input: ["speech"],
+      input: ["speech", "dtmf"],
       speechTimeout: "auto",
       timeout: 8,
       actionOnEmptyResult: true,
       action: actionUrl(req, { audioUrl }),
       method: "POST",
+      numDigits: 1,
     });
     gather.say(" ");
   }
