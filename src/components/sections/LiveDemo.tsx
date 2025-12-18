@@ -11,6 +11,8 @@ export function LiveDemo() {
   const [phone, setPhone] = useState("");
   const [status, setStatus] = useState<"idle" | "sending" | "sent">("idle");
   const [focused, setFocused] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [callSid, setCallSid] = useState<string | null>(null);
 
   const digits = useMemo(() => phone.replace(/\D/g, ""), [phone]);
   const canSubmit = useMemo(() => digits.length >= 10 && status !== "sending", [digits.length, status]);
@@ -19,10 +21,25 @@ export function LiveDemo() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!canSubmit) return;
+    setError(null);
+    setCallSid(null);
     setStatus("sending");
-    // Placeholder: integrate Twilio/voice-demo backend later.
-    await new Promise((r) => setTimeout(r, 700));
-    setStatus("sent");
+    try {
+      const res = await fetch("/api/demo/call", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone }),
+      });
+      const data = (await res.json().catch(() => null)) as null | { ok?: boolean; error?: string; callSid?: string };
+      if (!res.ok || !data?.ok) {
+        throw new Error(data?.error || "Unable to start demo call.");
+      }
+      setCallSid(data.callSid ?? null);
+      setStatus("sent");
+    } catch (err) {
+      setStatus("idle");
+      setError(err instanceof Error ? err.message : "Unable to start demo call.");
+    }
   }
 
   return (
@@ -107,9 +124,20 @@ export function LiveDemo() {
                     </div>
                   </form>
 
+                  {error ? (
+                    <div className="mt-4 rounded-xl border border-border bg-surface-2 px-4 py-3 text-sm text-foreground">
+                      <span className="font-semibold">Could not start call.</span> {error}
+                    </div>
+                  ) : null}
+
                   {status === "sent" ? (
                     <div className="mt-4 rounded-xl border border-border bg-surface-2 px-4 py-3 text-sm text-foreground">
                       We’ll call you shortly. This is a prototype flow in the MVP.
+                      {callSid ? (
+                        <div className="mt-2 text-xs text-muted">
+                          Call SID: <span className="font-mono">{callSid}</span>
+                        </div>
+                      ) : null}
                     </div>
                   ) : null}
                 </div>
