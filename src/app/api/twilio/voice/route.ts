@@ -1,6 +1,6 @@
 import { storeMp3ForTwilio } from "@/lib/audioStorage";
 import { synthesizeWithElevenLabs } from "@/lib/elevenlabsClient";
-import { generateDemoScript } from "@/lib/openaiClient";
+import { respondAsOmriqGrandPalais } from "@/lib/hotel/respond";
 import { NextResponse } from "next/server";
 import twilio from "twilio";
 
@@ -35,10 +35,8 @@ export async function POST(req: Request) {
     });
   }
 
-  // Generate a calm reply. (OpenAI may fallback to a canned script if quota is exceeded.)
-  const replyText =
-    `Thank you. I heard: ${speech}. ` +
-    "This is a demo call, and no reservations are created. What would you like to know?";
+  // Hotel-trained response (Omriq Grand Palais demo property).
+  const replyText = respondAsOmriqGrandPalais(speech);
   const replyMp3 = await synthesizeWithElevenLabs(replyText);
   const storedReply = await storeMp3ForTwilio(replyMp3, req);
   twiml.play(storedReply.url);
@@ -67,7 +65,9 @@ export async function GET(req: Request) {
   const VoiceResponse = twilio.twiml.VoiceResponse;
   const twiml = new VoiceResponse();
   if (!audioUrl) {
-    const first = (await generateDemoScript()) + " How may I assist you today?";
+    const first =
+      `Thank you for calling ${"Omriq Grand Palais"}. ` +
+      "How may I assist you today?";
     const mp3 = await synthesizeWithElevenLabs(first);
     const stored = await storeMp3ForTwilio(mp3, req);
     twiml.play(stored.url);
