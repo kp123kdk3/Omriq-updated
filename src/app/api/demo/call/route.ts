@@ -1,6 +1,6 @@
-import { putAudio, cleanupAudioStore } from "@/lib/audioStore";
+import { cleanupAudioStore } from "@/lib/audioStore";
+import { storeMp3ForTwilio } from "@/lib/audioStorage";
 import { synthesizeWithElevenLabs } from "@/lib/elevenlabsClient";
-import { env } from "@/lib/env";
 import { generateDemoScript } from "@/lib/openaiClient";
 import { getTwilioClient, getTwilioFromNumber } from "@/lib/twilioClient";
 import { NextResponse } from "next/server";
@@ -8,11 +8,9 @@ import { NextResponse } from "next/server";
 export const runtime = "nodejs";
 
 function requestBaseUrl(req: Request) {
-  // Prefer explicit env, but fall back to request headers (works well on Vercel).
-  if (env.APP_BASE_URL) return env.APP_BASE_URL;
   const proto = req.headers.get("x-forwarded-proto") ?? "https";
   const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? "";
-  if (!host) throw new Error("Missing APP_BASE_URL and could not infer host from request.");
+  if (!host) throw new Error("Could not infer host from request.");
   return `${proto}://${host}`;
 }
 
@@ -39,15 +37,18 @@ export async function POST(req: Request) {
   if (!to) return NextResponse.json({ ok: false, error: "Invalid phone number." }, { status: 400 });
 
   try {
-    const text = await generateDemoScript();
+    // First message should include a clear question so we can continue the conversation.
+    const text =
+      (await generateDemoScript()) +
+      " How may I assist you today?";
     const mp3 = await synthesizeWithElevenLabs(text);
-    const audioId = putAudio(mp3, "audio/mpeg");
+    const stored = await storeMp3ForTwilio(mp3, req);
 
     const client = getTwilioClient();
     const from = getTwilioFromNumber();
 
     // Twilio will request this URL to get TwiML instructions.
-    const twimlUrl = `${requestBaseUrl(req)}/api/twilio/voice?audioId=${encodeURIComponent(audioId)}`;
+    const twimlUrl = `${requestBaseUrl(req)}/api/twilio/voice?audioUrl=${encodeURIComponent(stored.url)}&turn=0`;
 
     const call = await client.calls.create({
       to,

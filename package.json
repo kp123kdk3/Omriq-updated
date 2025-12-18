@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@vercel/blob": "^2.0.0",
     "elevenlabs": "^1.59.0",
     "framer-motion": "^12.23.26",
     "next": "16.0.10",
