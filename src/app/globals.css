@@ -1,0 +1,52 @@
+@import "tailwindcss";
+
+:root {
+  /* Omriq: calm, enterprise, hospitality-forward */
+  --background: #fbfbfc; /* very light off-white */
+  --foreground: #0b0f17; /* near-black */
+
+  --muted: rgba(15, 23, 42, 0.55); /* secondary text */
+  --muted-2: #7a8392;
+  --border: rgba(15, 23, 42, 0.08);
+  --omriq-border: rgba(15, 23, 42, 0.08);
+
+  --omriq-blue: #2f5bff; /* single accent */
+  --omriq-blue-weak: rgba(47, 91, 255, 0.12);
+  --omriq-blue-ink: #0d2aa6;
+  --omriq-muted: rgba(15, 23, 42, 0.55);
+
+  --surface: #ffffff;
+  --surface-2: #f5f6f8;
+  --surface-inverse: #0b0f17;
+  --surface-inverse-2: #101827;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-muted-2: var(--muted-2);
+  --color-border: var(--border);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-inverse: var(--surface-inverse);
+  --color-surface-inverse-2: var(--surface-inverse-2);
+  --color-accent: var(--omriq-blue);
+  --color-accent-ink: var(--omriq-blue-ink);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+::selection {
+  background: rgba(47, 91, 255, 0.16);
+}
+
+:focus-visible {
+  outline: 2px solid rgba(47, 91, 255, 0.55);
+  outline-offset: 3px;
+}
