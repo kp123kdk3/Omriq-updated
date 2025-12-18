@@ -15,90 +15,101 @@ function actionUrl(req: Request, params: Record<string, string | number>) {
   return url.toString();
 }
 
-export async function POST(req: Request) {
-  // Twilio hits this webhook (POST by default)
-  const form = await req.formData();
-  const speech = String(form.get("SpeechResult") ?? "").trim();
-  const url = new URL(req.url);
-  const audioUrl = url.searchParams.get("audioUrl") ?? "";
+async function playOrSay(twiml: twilio.twiml.VoiceResponse, req: Request, text: string) {
+  // If Vercel Blob is configured, we can reliably host MP3 audio for <Play>.
+  // If not, fall back to Twilio <Say> to avoid "Application error" caused by audio fetch failures.
+  const hasBlob = !!process.env.BLOB_READ_WRITE_TOKEN;
+  if (!hasBlob) {
+    twiml.say({ voice: "alice", language: "en-US" }, text);
+    return;
+  }
 
+  const mp3 = await synthesizeWithElevenLabs(text);
+  const stored = await storeMp3ForTwilio(mp3, req);
+  twiml.play(stored.url);
+}
+
+export async function POST(req: Request) {
   const VoiceResponse = twilio.twiml.VoiceResponse;
   const twiml = new VoiceResponse();
 
-  // Requirement: keep the agent on the line indefinitely while the caller keeps speaking.
-  // Hang up ONLY when the caller does not speak for > 8 seconds.
-  if (!speech) {
-    twiml.hangup();
-    return new NextResponse(twiml.toString(), {
-      status: 200,
-      headers: { "Content-Type": "text/xml" },
+  try {
+    // Twilio hits this webhook (POST by default)
+    const form = await req.formData();
+    const speech = String(form.get("SpeechResult") ?? "").trim();
+    const url = new URL(req.url);
+    const audioUrl = url.searchParams.get("audioUrl") ?? "";
+
+    // Requirement: keep the agent on the line indefinitely while the caller keeps speaking.
+    // Hang up ONLY when the caller does not speak for > 8 seconds.
+    if (!speech) {
+      twiml.hangup();
+      return new NextResponse(twiml.toString(), {
+        status: 200,
+        headers: { "Content-Type": "text/xml" },
+      });
+    }
+
+    const replyText = respondAsOmriqGrandPalais(speech);
+    await playOrSay(twiml, req, replyText);
+
+    const gather = twiml.gather({
+      input: ["speech"],
+      speechTimeout: "auto",
+      timeout: 8,
+      actionOnEmptyResult: true,
+      action: actionUrl(req, { audioUrl: audioUrl || "" }),
+      method: "POST",
     });
+    gather.say(" ");
+  } catch (err) {
+    console.error("[twilio/voice] POST error", err);
+    twiml.say({ voice: "alice", language: "en-US" }, "Sorry, there was a system error. Please try again.");
+    twiml.hangup();
   }
 
-  // Hotel-trained response (Omriq Grand Palais demo property).
-  const replyText = speech
-    ? respondAsOmriqGrandPalais(speech)
-    : "Thank you. How may I assist you at Omriq Grand Palais?";
-  const replyMp3 = await synthesizeWithElevenLabs(replyText);
-  const storedReply = await storeMp3ForTwilio(replyMp3, req);
-  twiml.play(storedReply.url);
-
-  const gather = twiml.gather({
-    input: ["speech"],
-    speechTimeout: "auto",
-    timeout: 8,
-    actionOnEmptyResult: true,
-    action: actionUrl(req, { audioUrl: audioUrl || "" }),
-    method: "POST",
-  });
-  gather.say(" ");
-
-  return new NextResponse(twiml.toString(), {
-    status: 200,
-    headers: { "Content-Type": "text/xml" },
-  });
+  return new NextResponse(twiml.toString(), { status: 200, headers: { "Content-Type": "text/xml" } });
 }
 
 export async function GET(req: Request) {
-  // Allow GET for easier testing
-  const url = new URL(req.url);
-  const audioUrl = url.searchParams.get("audioUrl") ?? "";
-
   const VoiceResponse = twilio.twiml.VoiceResponse;
   const twiml = new VoiceResponse();
-  if (!audioUrl) {
-    const first =
-      `Thank you for calling ${"Omriq Grand Palais"}. ` +
-      "How may I assist you today?";
-    const mp3 = await synthesizeWithElevenLabs(first);
-    const stored = await storeMp3ForTwilio(mp3, req);
-    twiml.play(stored.url);
-    const gather = twiml.gather({
-      input: ["speech"],
-      speechTimeout: "auto",
-      timeout: 8,
-      actionOnEmptyResult: true,
-      action: actionUrl(req, { audioUrl: stored.url }),
-      method: "POST",
-    });
-    gather.say(" ");
-  } else {
-    twiml.play(audioUrl);
-    const gather = twiml.gather({
-      input: ["speech"],
-      speechTimeout: "auto",
-      timeout: 8,
-      actionOnEmptyResult: true,
-      action: actionUrl(req, { audioUrl }),
-      method: "POST",
-    });
-    gather.say(" ");
+  try {
+    // Allow GET for easier testing
+    const url = new URL(req.url);
+    const audioUrl = url.searchParams.get("audioUrl") ?? "";
+
+    if (!audioUrl) {
+      const first = "Thank you for calling Omriq Grand Palais. How may I assist you today?";
+      await playOrSay(twiml, req, first);
+      const gather = twiml.gather({
+        input: ["speech"],
+        speechTimeout: "auto",
+        timeout: 8,
+        actionOnEmptyResult: true,
+        action: actionUrl(req, { audioUrl: "" }),
+        method: "POST",
+      });
+      gather.say(" ");
+    } else {
+      twiml.play(audioUrl);
+      const gather = twiml.gather({
+        input: ["speech"],
+        speechTimeout: "auto",
+        timeout: 8,
+        actionOnEmptyResult: true,
+        action: actionUrl(req, { audioUrl }),
+        method: "POST",
+      });
+      gather.say(" ");
+    }
+  } catch (err) {
+    console.error("[twilio/voice] GET error", err);
+    twiml.say({ voice: "alice", language: "en-US" }, "Sorry, there was a system error. Goodbye.");
+    twiml.hangup();
   }
 
-  return new NextResponse(twiml.toString(), {
-    status: 200,
-    headers: { "Content-Type": "text/xml" },
-  });
+  return new NextResponse(twiml.toString(), { status: 200, headers: { "Content-Type": "text/xml" } });
 }
 
 
