@@ -1,6 +1,41 @@
 export const omriqGrandPalais = {
   name: "Omriq Grand Palais",
   positioning: "Ultra-luxury demonstration hotel for the Omriq Intelligence Platform.",
+  basics: {
+    checkIn: "3:00 PM",
+    checkOut: "12:00 PM",
+    wifi: "Complimentary high-speed Wi‑Fi throughout the property and in all rooms.",
+    concierge: "24-hour concierge available by phone, in-app chat, or at the lobby desk.",
+    housekeeping: "Housekeeping twice daily with evening turndown service available on request.",
+  },
+  services: {
+    roomService: {
+      available: true,
+      hours: "24 hours",
+      note: "Late-night menu available overnight. Allergy accommodations supported.",
+    },
+    laundry: {
+      available: true,
+      note: "Same-day pressing available for early drop-offs.",
+    },
+    valet: {
+      available: true,
+      note: "Valet parking available at the main entrance.",
+    },
+  },
+  roomAmenities: {
+    connectivity: ["In-room tablet for service requests", "Voice request support", "Multiple USB-C and universal charging ports"],
+    comfort: ["Blackout curtains", "Quiet HVAC with 0.5°C precision control", "Premium robe and slippers"],
+    refreshments: ["Minibar with non-alcoholic and premium options", "Espresso machine and tea service", "Filtered water on arrival and refill service"],
+    bath: ["Deep soaking tub in select rooms", "Rain shower", "Luxury bath amenities", "Hair dryer and styling tools on request"],
+    business: ["Dedicated work desk", "International power outlets", "On-request printing via concierge"],
+  },
+  propertyAmenities: {
+    wellness: ["Wellness Spa", "Indoor pool", "Outdoor infinity pool (seasonal)", "Fitness center", "Private training sessions"],
+    dining: ["All-day dining", "Breakfast service", "Room service"],
+    families: ["Kids Club", "Babysitting", "Family-friendly equipment on request"],
+    transport: ["Airport transfers", "Child seats available"],
+  },
   climate: {
     lobbyDayC: 21.5,
     lobbyEveningC: 21,

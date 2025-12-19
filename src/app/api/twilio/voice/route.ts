@@ -92,7 +92,7 @@ export async function GET(req: Request) {
     const audioUrl = url.searchParams.get("audioUrl") ?? "";
 
     if (!audioUrl) {
-      const first = "Thank you for calling Omriq Grand Palais. How may I assist you today?";
+      const first = "Hello and welcome to hotel Omriq. How may I help you today?";
       const gather = twiml.gather({
         input: ["speech"],
         speechTimeout: "auto",

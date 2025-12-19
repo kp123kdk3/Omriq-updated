@@ -16,10 +16,61 @@ function normalize(text: string) {
   return text.toLowerCase().replace(/\s+/g, " ").trim();
 }
 
+function oneLine(s: string) {
+  return s.replace(/\s+/g, " ").trim();
+}
+
 export function respondAsOmriqGrandPalais(userText: string) {
   const q = normalize(userText);
   if (!q) {
-    return "How may I assist you at Omriq Grand Palais?";
+    return `How may I assist you at ${H.name}?`;
+  }
+
+  // Room service / dining basics
+  if (includesAny(q, ["room service", "in-room dining", "order food", "food to my room", "menu"])) {
+    return oneLine(
+      `Yes, we offer room service ${H.services.roomService.hours}. ${H.services.roomService.note} ` +
+        `Would you like breakfast, a light meal, or something specific?`,
+    );
+  }
+
+  // In-room amenities
+  if (includesAny(q, ["amenities in the room", "room amenities", "in the room", "what comes in the room", "what is in the room"])) {
+    return oneLine(
+      `In-room amenities include an espresso and tea service, minibar, premium robe and slippers, blackout curtains, and an in-room tablet for requests. ` +
+        `If you tell me your room type, I can be more specific.`,
+    );
+  }
+
+  // Wi‑Fi
+  if (includesAny(q, ["wifi", "wi-fi", "internet", "password"])) {
+    return oneLine(`${H.basics.wifi} If you’re already checked in, I can guide you to the Wi‑Fi details on the in-room tablet.`);
+  }
+
+  // Check-in / check-out
+  if (includesAny(q, ["check in", "check-in", "check out", "check-out", "early check", "late check"])) {
+    return oneLine(
+      `Check-in is at ${H.basics.checkIn} and check-out is at ${H.basics.checkOut}. ` +
+        `If you need early check-in or late check-out, we’ll do our best based on availability.`,
+    );
+  }
+
+  // Housekeeping
+  if (includesAny(q, ["housekeeping", "clean", "towels", "turn down", "turndown", "extra linens"])) {
+    return oneLine(`${H.basics.housekeeping} What would you like delivered or arranged?`);
+  }
+
+  // Concierge / general help
+  if (includesAny(q, ["concierge", "help", "recommend", "reservation", "book", "arrange"])) {
+    return oneLine(`${H.basics.concierge} What would you like me to arrange?`);
+  }
+
+  // Hotel amenities (property)
+  if (includesAny(q, ["amenities", "facilities", "what do you have", "what is available", "what's available"])) {
+    return oneLine(
+      `We have a full wellness spa, fitness center, indoor pool, and seasonal outdoor infinity pool. ` +
+        `We also offer Kids Club, babysitting, and airport transfers. What are you most interested in?`,
+    );
   }
 
   // Climate / temperature
@@ -106,10 +157,7 @@ export function respondAsOmriqGrandPalais(userText: string) {
   }
 
   // Default: ask a clarifying question while staying confident and calm.
-  return (
-    `I can help with rooms and sleep preferences, spa treatments, gym equipment, pools, dining and allergens, kids services, and transfers. ` +
-    `What would you like to know about at ${H.name}?`
-  );
+  return oneLine(`How may I help you at ${H.name}? You can ask about rooms, dining, spa, gym, pools, family services, or transfers.`);
 }
 
 
