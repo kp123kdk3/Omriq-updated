@@ -1,6 +1,8 @@
-import { put } from "@vercel/blob";
+import { head, put } from "@vercel/blob";
 import { env } from "@/lib/env";
 import { putAudio } from "@/lib/audioStore";
+import crypto from "node:crypto";
+import { synthesizeWithElevenLabs } from "@/lib/elevenlabsClient";
 
 type PutResult =
   | { kind: "blob"; url: string }
@@ -31,6 +33,36 @@ export async function storeMp3ForTwilio(bytes: Buffer, req: Request): Promise<Pu
   const audioId = putAudio(bytes, "audio/mpeg");
   const url = `${requestBaseUrl(req)}/api/media/${encodeURIComponent(audioId)}`;
   return { kind: "memory", audioId, url };
+}
+
+export async function ttsUrlForTwilio(text: string, req: Request): Promise<PutResult> {
+  const token = process.env.BLOB_READ_WRITE_TOKEN;
+  if (token) {
+    const hash = crypto.createHash("sha256").update(text).digest("hex").slice(0, 24);
+    const pathname = `omriq/tts-cache/${hash}.mp3`;
+
+    // Try cache first.
+    try {
+      const existing = await head(pathname, { token });
+      if (existing?.url) return { kind: "blob", url: existing.url };
+    } catch {
+      // Not found or no access, continue to generate.
+    }
+
+    const bytes = await synthesizeWithElevenLabs(text);
+    const res = await put(pathname, bytes, {
+      access: "public",
+      contentType: "audio/mpeg",
+      token,
+      addRandomSuffix: false,
+      allowOverwrite: true,
+    });
+    return { kind: "blob", url: res.url };
+  }
+
+  // Local fallback.
+  const bytes = await synthesizeWithElevenLabs(text);
+  return storeMp3ForTwilio(bytes, req);
 }
 
 

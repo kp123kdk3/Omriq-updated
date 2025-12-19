@@ -1,5 +1,4 @@
-import { storeMp3ForTwilio } from "@/lib/audioStorage";
-import { synthesizeWithElevenLabs } from "@/lib/elevenlabsClient";
+import { ttsUrlForTwilio } from "@/lib/audioStorage";
 import { respondAsOmriqGrandPalais } from "@/lib/hotel/respond";
 import { NextResponse } from "next/server";
 import twilio from "twilio";
@@ -16,16 +15,12 @@ function actionUrl(req: Request, params: Record<string, string | number>) {
 }
 
 async function playOrSay(twiml: twilio.twiml.VoiceResponse, req: Request, text: string) {
-  // If Vercel Blob is configured, we can reliably host MP3 audio for <Play>.
-  // If not, fall back to Twilio <Say> to avoid "Application error" caused by audio fetch failures.
   const hasBlob = !!process.env.BLOB_READ_WRITE_TOKEN;
   if (!hasBlob) {
     twiml.say({ voice: "alice", language: "en-US" }, text);
     return;
   }
-
-  const mp3 = await synthesizeWithElevenLabs(text);
-  const stored = await storeMp3ForTwilio(mp3, req);
+  const stored = await ttsUrlForTwilio(text, req);
   twiml.play(stored.url);
 }
 
@@ -51,17 +46,24 @@ export async function POST(req: Request) {
     }
 
     const replyText = respondAsOmriqGrandPalais(speech);
-    await playOrSay(twiml, req, replyText);
-
+    // Barge-in: put the prompt inside the gather so Twilio stops playback if the caller starts talking.
     const gather = twiml.gather({
       input: ["speech"],
       speechTimeout: "auto",
       timeout: 8,
+      bargeIn: true,
       actionOnEmptyResult: true,
       action: actionUrl(req, { audioUrl: audioUrl || "" }),
       method: "POST",
     });
-    gather.say(" ");
+
+    const hasBlob = !!process.env.BLOB_READ_WRITE_TOKEN;
+    if (hasBlob) {
+      const stored = await ttsUrlForTwilio(replyText, req);
+      gather.play(stored.url);
+    } else {
+      gather.say({ voice: "alice", language: "en-US" }, replyText);
+    }
   } catch (err) {
     console.error("[twilio/voice] POST error", err);
     twiml.say({ voice: "alice", language: "en-US" }, "Sorry, there was a system error. Please try again.");
@@ -81,27 +83,33 @@ export async function GET(req: Request) {
 
     if (!audioUrl) {
       const first = "Thank you for calling Omriq Grand Palais. How may I assist you today?";
-      await playOrSay(twiml, req, first);
       const gather = twiml.gather({
         input: ["speech"],
         speechTimeout: "auto",
         timeout: 8,
+        bargeIn: true,
         actionOnEmptyResult: true,
         action: actionUrl(req, { audioUrl: "" }),
         method: "POST",
       });
-      gather.say(" ");
+      const hasBlob = !!process.env.BLOB_READ_WRITE_TOKEN;
+      if (hasBlob) {
+        const stored = await ttsUrlForTwilio(first, req);
+        gather.play(stored.url);
+      } else {
+        gather.say({ voice: "alice", language: "en-US" }, first);
+      }
     } else {
-      twiml.play(audioUrl);
       const gather = twiml.gather({
         input: ["speech"],
         speechTimeout: "auto",
         timeout: 8,
+        bargeIn: true,
         actionOnEmptyResult: true,
         action: actionUrl(req, { audioUrl }),
         method: "POST",
       });
-      gather.say(" ");
+      gather.play(audioUrl);
     }
   } catch (err) {
     console.error("[twilio/voice] GET error", err);

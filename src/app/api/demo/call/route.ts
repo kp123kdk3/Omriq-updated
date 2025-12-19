@@ -1,7 +1,4 @@
 import { cleanupAudioStore } from "@/lib/audioStore";
-import { storeMp3ForTwilio } from "@/lib/audioStorage";
-import { synthesizeWithElevenLabs } from "@/lib/elevenlabsClient";
-import { generateDemoScript } from "@/lib/openaiClient";
 import { getTwilioClient, getTwilioFromNumber } from "@/lib/twilioClient";
 import { NextResponse } from "next/server";
 
@@ -40,17 +37,9 @@ export async function POST(req: Request) {
     const client = getTwilioClient();
     const from = getTwilioFromNumber();
 
-    const hasBlob = !!process.env.BLOB_READ_WRITE_TOKEN;
     // Twilio will request this URL to get TwiML instructions.
-    // If we don't have Blob configured, avoid passing audioUrl and let /api/twilio/voice use <Say> fallback.
-    let twimlUrl = `${requestBaseUrl(req)}/api/twilio/voice`;
-    if (hasBlob) {
-      // First message should include a clear question so we can continue the conversation.
-      const text = (await generateDemoScript()) + " How may I assist you today?";
-      const mp3 = await synthesizeWithElevenLabs(text);
-      const stored = await storeMp3ForTwilio(mp3, req);
-      twimlUrl = `${requestBaseUrl(req)}/api/twilio/voice?audioUrl=${encodeURIComponent(stored.url)}`;
-    }
+    // The voice webhook will handle greeting + barge-in gather.
+    const twimlUrl = `${requestBaseUrl(req)}/api/twilio/voice`;
 
     const call = await client.calls.create({
       to,
