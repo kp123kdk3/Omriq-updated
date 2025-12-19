@@ -14,10 +14,20 @@ function actionUrl(req: Request, params: Record<string, string | number>) {
   return url.toString();
 }
 
+function absoluteTtsUrl(req: Request, text: string) {
+  const proto = req.headers.get("x-forwarded-proto") ?? "https";
+  const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? "";
+  if (!host) throw new Error("Could not infer host from request.");
+  const url = new URL(`${proto}://${host}/api/tts`);
+  url.searchParams.set("text", text);
+  return url.toString();
+}
+
 async function playOrSay(twiml: twilio.twiml.VoiceResponse, req: Request, text: string) {
   const hasBlob = !!process.env.BLOB_READ_WRITE_TOKEN;
   if (!hasBlob) {
-    twiml.say({ voice: "alice", language: "en-US" }, text);
+    // No Blob: still use ElevenLabs by letting Twilio fetch audio from our public /api/tts endpoint.
+    twiml.play(absoluteTtsUrl(req, text));
     return;
   }
   const stored = await ttsUrlForTwilio(text, req);
@@ -62,7 +72,7 @@ export async function POST(req: Request) {
       const stored = await ttsUrlForTwilio(replyText, req);
       gather.play(stored.url);
     } else {
-      gather.say({ voice: "alice", language: "en-US" }, replyText);
+      gather.play(absoluteTtsUrl(req, replyText));
     }
   } catch (err) {
     console.error("[twilio/voice] POST error", err);
@@ -97,7 +107,7 @@ export async function GET(req: Request) {
         const stored = await ttsUrlForTwilio(first, req);
         gather.play(stored.url);
       } else {
-        gather.say({ voice: "alice", language: "en-US" }, first);
+        gather.play(absoluteTtsUrl(req, first));
       }
     } else {
       const gather = twiml.gather({
