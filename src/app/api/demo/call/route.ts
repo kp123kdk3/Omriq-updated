@@ -4,6 +4,15 @@ import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
+const ALLOWED_VOICE_KEYS = new Set([
+  "concierge",
+  "front-desk",
+  "night-manager",
+  "guest-relations",
+  "reservations",
+  "spa-host",
+]);
+
 function requestBaseUrl(req: Request) {
   const proto = req.headers.get("x-forwarded-proto") ?? "https";
   const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? "";
@@ -28,10 +37,13 @@ function normalizePhone(input: string) {
 export async function POST(req: Request) {
   cleanupAudioStore();
 
-  const body = (await req.json().catch(() => null)) as null | { phone?: string };
+  const body = (await req.json().catch(() => null)) as null | { phone?: string; voiceId?: string };
   const phoneRaw = body?.phone ?? "";
   const to = normalizePhone(phoneRaw);
   if (!to) return NextResponse.json({ ok: false, error: "Invalid phone number." }, { status: 400 });
+
+  const voiceKeyRaw = String(body?.voiceId ?? "").trim().toLowerCase();
+  const voiceKey = ALLOWED_VOICE_KEYS.has(voiceKeyRaw) ? voiceKeyRaw : "";
 
   try {
     const client = getTwilioClient();
@@ -39,7 +51,8 @@ export async function POST(req: Request) {
 
     // Twilio will request this URL to get TwiML instructions.
     // The voice webhook will handle greeting + barge-in gather.
-    const twimlUrl = `${requestBaseUrl(req)}/api/twilio/voice`;
+    const twimlUrl =
+      voiceKey ? `${requestBaseUrl(req)}/api/twilio/voice?voice=${encodeURIComponent(voiceKey)}` : `${requestBaseUrl(req)}/api/twilio/voice`;
 
     const call = await client.calls.create({
       to,

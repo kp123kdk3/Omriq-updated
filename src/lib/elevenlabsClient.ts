@@ -1,9 +1,9 @@
 import { requireEnv } from "@/lib/env";
 
 // MVP: call ElevenLabs REST API directly to get MP3 bytes.
-export async function synthesizeWithElevenLabs(text: string) {
+export async function synthesizeWithElevenLabs(text: string, voiceIdOverride?: string) {
   const apiKey = requireEnv("ELEVENLABS_API_KEY");
-  const voiceId = requireEnv("ELEVENLABS_VOICE_ID");
+  const voiceId = voiceIdOverride || requireEnv("ELEVENLABS_VOICE_ID");
 
   // Higher bitrate helps reduce "robotic" artifacts on phone playback.
   // `optimize_streaming_latency` keeps responses snappy without overly degrading quality.

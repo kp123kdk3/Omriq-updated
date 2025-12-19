@@ -35,10 +35,11 @@ export async function storeMp3ForTwilio(bytes: Buffer, req: Request): Promise<Pu
   return { kind: "memory", audioId, url };
 }
 
-export async function ttsUrlForTwilio(text: string, req: Request): Promise<PutResult> {
+export async function ttsUrlForTwilio(text: string, req: Request, voiceIdOverride?: string): Promise<PutResult> {
   const token = process.env.BLOB_READ_WRITE_TOKEN;
   if (token) {
-    const hash = crypto.createHash("sha256").update(text).digest("hex").slice(0, 24);
+    const key = `${voiceIdOverride ?? ""}|${text}`;
+    const hash = crypto.createHash("sha256").update(key).digest("hex").slice(0, 24);
     const pathname = `omriq/tts-cache/${hash}.mp3`;
 
     // Try cache first.
@@ -49,7 +50,7 @@ export async function ttsUrlForTwilio(text: string, req: Request): Promise<PutRe
       // Not found or no access, continue to generate.
     }
 
-    const bytes = await synthesizeWithElevenLabs(text);
+    const bytes = await synthesizeWithElevenLabs(text, voiceIdOverride);
     const res = await put(pathname, bytes, {
       access: "public",
       contentType: "audio/mpeg",
@@ -61,7 +62,7 @@ export async function ttsUrlForTwilio(text: string, req: Request): Promise<PutRe
   }
 
   // Local fallback.
-  const bytes = await synthesizeWithElevenLabs(text);
+  const bytes = await synthesizeWithElevenLabs(text, voiceIdOverride);
   return storeMp3ForTwilio(bytes, req);
 }
 
