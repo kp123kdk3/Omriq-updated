@@ -5,7 +5,11 @@ export async function synthesizeWithElevenLabs(text: string) {
   const apiKey = requireEnv("ELEVENLABS_API_KEY");
   const voiceId = requireEnv("ELEVENLABS_VOICE_ID");
 
-  const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/stream?output_format=mp3_44100_128`, {
+  // Higher bitrate helps reduce "robotic" artifacts on phone playback.
+  // `optimize_streaming_latency` keeps responses snappy without overly degrading quality.
+  const res = await fetch(
+    `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/stream?output_format=mp3_44100_192&optimize_streaming_latency=2`,
+    {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -15,9 +19,11 @@ export async function synthesizeWithElevenLabs(text: string) {
     body: JSON.stringify({
       text,
       model_id: "eleven_multilingual_v2",
-      voice_settings: { stability: 0.35, similarity_boost: 0.8, style: 0.25, use_speaker_boost: true },
+      // Tuned for a calmer, more human concierge delivery.
+      voice_settings: { stability: 0.25, similarity_boost: 0.9, style: 0.45, use_speaker_boost: true },
     }),
-  });
+    },
+  );
 
   if (!res.ok) {
     const msg = await res.text().catch(() => "");
