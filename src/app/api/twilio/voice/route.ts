@@ -2,6 +2,7 @@ import { ttsUrlForTwilio } from "@/lib/audioStorage";
 import { respondAsOmriqGrandPalais } from "@/lib/hotel/respond";
 import { NextResponse } from "next/server";
 import twilio from "twilio";
+import type { ElevenLabsVoiceSettings } from "@/lib/elevenlabsClient";
 
 export const runtime = "nodejs";
 
@@ -35,6 +36,19 @@ function resolveElevenLabsVoiceIdFromKey(voiceKey: string) {
               ? "ELEVENLABS_VOICE_ID_RESERVATIONS"
               : "ELEVENLABS_VOICE_ID_CONCIERGE";
   return process.env[envVar] || process.env.ELEVENLABS_VOICE_ID;
+}
+
+function resolveVoiceSettingsFromKey(voiceKey: string): ElevenLabsVoiceSettings | undefined {
+  if (!voiceKey) return undefined;
+  const map: Record<string, ElevenLabsVoiceSettings> = {
+    concierge: { stability: 0.28, similarity_boost: 0.9, style: 0.42, use_speaker_boost: true },
+    "front-desk": { stability: 0.42, similarity_boost: 0.86, style: 0.18, use_speaker_boost: true },
+    "night-manager": { stability: 0.58, similarity_boost: 0.84, style: 0.06, use_speaker_boost: true },
+    "guest-relations": { stability: 0.36, similarity_boost: 0.9, style: 0.28, use_speaker_boost: true },
+    reservations: { stability: 0.46, similarity_boost: 0.82, style: 0.14, use_speaker_boost: true },
+    "spa-host": { stability: 0.22, similarity_boost: 0.9, style: 0.55, use_speaker_boost: true },
+  };
+  return map[voiceKey];
 }
 
 function actionUrl(req: Request, params: Record<string, string | number>) {
@@ -105,8 +119,10 @@ export async function POST(req: Request) {
 
     const hasBlob = !!process.env.BLOB_READ_WRITE_TOKEN;
     if (hasBlob) {
-      const voiceId = resolveElevenLabsVoiceIdFromKey(resolveVoiceKey(req));
-      const stored = await ttsUrlForTwilio(replyText, req, voiceId);
+      const voiceKey = resolveVoiceKey(req);
+      const voiceId = resolveElevenLabsVoiceIdFromKey(voiceKey);
+      const settings = resolveVoiceSettingsFromKey(voiceKey);
+      const stored = await ttsUrlForTwilio(replyText, req, voiceId, settings);
       gather.play(stored.url);
     } else {
       gather.play(absoluteTtsUrl(req, replyText));
@@ -141,8 +157,10 @@ export async function GET(req: Request) {
       });
       const hasBlob = !!process.env.BLOB_READ_WRITE_TOKEN;
       if (hasBlob) {
-        const voiceId = resolveElevenLabsVoiceIdFromKey(resolveVoiceKey(req));
-        const stored = await ttsUrlForTwilio(first, req, voiceId);
+        const voiceKey = resolveVoiceKey(req);
+        const voiceId = resolveElevenLabsVoiceIdFromKey(voiceKey);
+        const settings = resolveVoiceSettingsFromKey(voiceKey);
+        const stored = await ttsUrlForTwilio(first, req, voiceId, settings);
         gather.play(stored.url);
       } else {
         gather.play(absoluteTtsUrl(req, first));

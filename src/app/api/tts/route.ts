@@ -1,4 +1,4 @@
-import { synthesizeWithElevenLabs } from "@/lib/elevenlabsClient";
+import { synthesizeWithElevenLabs, type ElevenLabsVoiceSettings } from "@/lib/elevenlabsClient";
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
@@ -33,6 +33,23 @@ function resolveElevenLabsVoiceIdFromKey(voiceKey: string | null) {
   return id || undefined;
 }
 
+function resolveVoiceSettingsFromKey(voiceKey: string | null): ElevenLabsVoiceSettings | undefined {
+  const key = (voiceKey ?? "").trim().toLowerCase();
+  if (!key || !ALLOWED_VOICE_KEYS.has(key)) return undefined;
+
+  // Even if all voices map to the same ElevenLabs Voice ID, these settings make them audibly distinct.
+  // Keep changes tasteful: calm, hospitality-appropriate, no cartoon energy.
+  const map: Record<string, ElevenLabsVoiceSettings> = {
+    concierge: { stability: 0.28, similarity_boost: 0.9, style: 0.42, use_speaker_boost: true },
+    "front-desk": { stability: 0.42, similarity_boost: 0.86, style: 0.18, use_speaker_boost: true },
+    "night-manager": { stability: 0.58, similarity_boost: 0.84, style: 0.06, use_speaker_boost: true },
+    "guest-relations": { stability: 0.36, similarity_boost: 0.9, style: 0.28, use_speaker_boost: true },
+    reservations: { stability: 0.46, similarity_boost: 0.82, style: 0.14, use_speaker_boost: true },
+    "spa-host": { stability: 0.22, similarity_boost: 0.9, style: 0.55, use_speaker_boost: true },
+  };
+  return map[key];
+}
+
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const textRaw = url.searchParams.get("text") ?? "";
@@ -45,7 +62,8 @@ export async function GET(req: Request) {
 
   try {
     const voiceId = resolveElevenLabsVoiceIdFromKey(voiceKey);
-    const mp3 = await synthesizeWithElevenLabs(text, voiceId);
+    const settings = resolveVoiceSettingsFromKey(voiceKey);
+    const mp3 = await synthesizeWithElevenLabs(text, voiceId, settings);
     // Return Uint8Array for NextResponse compatibility.
     return new NextResponse(new Uint8Array(mp3), {
       status: 200,

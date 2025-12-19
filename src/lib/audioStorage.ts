@@ -2,7 +2,7 @@ import { head, put } from "@vercel/blob";
 import { env } from "@/lib/env";
 import { putAudio } from "@/lib/audioStore";
 import crypto from "node:crypto";
-import { synthesizeWithElevenLabs } from "@/lib/elevenlabsClient";
+import { synthesizeWithElevenLabs, type ElevenLabsVoiceSettings } from "@/lib/elevenlabsClient";
 
 type PutResult =
   | { kind: "blob"; url: string }
@@ -35,10 +35,16 @@ export async function storeMp3ForTwilio(bytes: Buffer, req: Request): Promise<Pu
   return { kind: "memory", audioId, url };
 }
 
-export async function ttsUrlForTwilio(text: string, req: Request, voiceIdOverride?: string): Promise<PutResult> {
+export async function ttsUrlForTwilio(
+  text: string,
+  req: Request,
+  voiceIdOverride?: string,
+  voiceSettingsOverride?: ElevenLabsVoiceSettings,
+): Promise<PutResult> {
   const token = process.env.BLOB_READ_WRITE_TOKEN;
   if (token) {
-    const key = `${voiceIdOverride ?? ""}|${text}`;
+    const settingsKey = voiceSettingsOverride ? JSON.stringify(voiceSettingsOverride) : "";
+    const key = `${voiceIdOverride ?? ""}|${settingsKey}|${text}`;
     const hash = crypto.createHash("sha256").update(key).digest("hex").slice(0, 24);
     const pathname = `omriq/tts-cache/${hash}.mp3`;
 
@@ -50,7 +56,7 @@ export async function ttsUrlForTwilio(text: string, req: Request, voiceIdOverrid
       // Not found or no access, continue to generate.
     }
 
-    const bytes = await synthesizeWithElevenLabs(text, voiceIdOverride);
+    const bytes = await synthesizeWithElevenLabs(text, voiceIdOverride, voiceSettingsOverride);
     const res = await put(pathname, bytes, {
       access: "public",
       contentType: "audio/mpeg",
@@ -62,7 +68,7 @@ export async function ttsUrlForTwilio(text: string, req: Request, voiceIdOverrid
   }
 
   // Local fallback.
-  const bytes = await synthesizeWithElevenLabs(text, voiceIdOverride);
+  const bytes = await synthesizeWithElevenLabs(text, voiceIdOverride, voiceSettingsOverride);
   return storeMp3ForTwilio(bytes, req);
 }
 

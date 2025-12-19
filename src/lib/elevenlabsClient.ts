@@ -1,9 +1,23 @@
 import { requireEnv } from "@/lib/env";
 
+export type ElevenLabsVoiceSettings = {
+  stability: number;
+  similarity_boost: number;
+  style: number;
+  use_speaker_boost: boolean;
+};
+
 // MVP: call ElevenLabs REST API directly to get MP3 bytes.
-export async function synthesizeWithElevenLabs(text: string, voiceIdOverride?: string) {
+export async function synthesizeWithElevenLabs(
+  text: string,
+  voiceIdOverride?: string,
+  voiceSettingsOverride?: ElevenLabsVoiceSettings,
+) {
   const apiKey = requireEnv("ELEVENLABS_API_KEY");
   const voiceId = voiceIdOverride || requireEnv("ELEVENLABS_VOICE_ID");
+
+  const voice_settings: ElevenLabsVoiceSettings =
+    voiceSettingsOverride ?? { stability: 0.25, similarity_boost: 0.9, style: 0.45, use_speaker_boost: true };
 
   // Higher bitrate helps reduce "robotic" artifacts on phone playback.
   // `optimize_streaming_latency` keeps responses snappy without overly degrading quality.
@@ -20,7 +34,7 @@ export async function synthesizeWithElevenLabs(text: string, voiceIdOverride?: s
       text,
       model_id: "eleven_multilingual_v2",
       // Tuned for a calmer, more human concierge delivery.
-      voice_settings: { stability: 0.25, similarity_boost: 0.9, style: 0.45, use_speaker_boost: true },
+      voice_settings,
     }),
     },
   );
